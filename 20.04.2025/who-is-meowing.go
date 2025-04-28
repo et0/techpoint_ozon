@@ -8,7 +8,7 @@ import (
 	"sort"
 )
 
-func main() {
+func Solve() {
 	var in *bufio.Reader
 	var out *bufio.Writer
 	in = bufio.NewReader(os.Stdin)
