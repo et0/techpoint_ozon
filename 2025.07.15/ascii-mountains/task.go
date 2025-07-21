@@ -46,11 +46,9 @@ func main() {
 		}
 
 		for i := 0; i < n; i++ {
-			for j := 0; j < m; j++ {
-				fmt.Fprint(out, string(mounting[i][j]))
-			}
-			fmt.Fprint(out, "\n")
+			out.Write(mounting[i])
+			out.WriteByte('\n')
 		}
-		fmt.Fprint(out, "\n")
+		out.WriteByte('\n')
 	}
 }
