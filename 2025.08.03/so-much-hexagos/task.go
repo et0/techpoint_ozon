@@ -88,10 +88,7 @@ func main() {
 	}
 
 	for i := 0; i < n+2; i++ {
-		for j := 0; j < m+2; j++ {
-			fmt.Printf("%c", grid[i][j])
-		}
-		fmt.Println()
+		fmt.Fprintln(out, string(grid[i]))
 	}
 
 }
