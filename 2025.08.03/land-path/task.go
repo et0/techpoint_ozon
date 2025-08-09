@@ -7,11 +7,6 @@ import (
 	"strings"
 )
 
-type cord struct {
-	mark byte // метка пути
-	n, m int  // координата
-}
-
 func main() {
 	var in *bufio.Reader
 	var out *bufio.Writer
@@ -40,7 +35,6 @@ func main() {
 			}
 
 			sourceMap[i] = []byte(strings.TrimRight(line, "\n"))
-			// resultMap[i] = []byte(fmt.Sprintf("%s", strings.Repeat("~", m)))
 
 			i++
 		}
@@ -58,8 +52,8 @@ func main() {
 		height, width := findDefaultHexagon(&sourceMap, m, n)
 
 		// находим верхний угол у двух фигур
-		startN1, startM1 := findStartHexagon(&sourceMap, n1, m1)
-		startN2, startM2 := findStartHexagon(&sourceMap, n2, m2)
+		startN1, startM1 := findStartHexagon(&sourceMap, n1-1, m1-1)
+		startN2, startM2 := findStartHexagon(&sourceMap, n2-1, m2-1)
 
 		// Если две координаты на одной фигуре
 		if startN1 == startN2 && startM1 == startM2 {
@@ -71,33 +65,31 @@ func main() {
 		sourceMap[startN1][startM1] = '1'
 		sourceMap[startN2][startM2] = '2'
 
-		// Создаём слайс накопитель возможных путей движения
-		// cap равно максимум, кол-ва элементов на карте
-		cords := make([]*cord, 0, (m/(height+width))*(n/height+1))
+		// Создаём слайсы - накопитель возможных путей движения для двух начальных точек
+		// cap равно максимальному кол-ву элементов на карте
+		cords1 := make([][2]int, 0, (m/(height+width))*(n/height+1))
+		cords2 := make([][2]int, 0, cap(cords1))
 
 		// Добавляем исходные координаты с которых начинается движение в стороны
-		cords = append(cords,
-			&cord{mark: '1', n: startN1, m: startM1}, // x1
-			&cord{mark: '2', n: startN2, m: startM2}, // x2
-		)
+		cords1 = append(cords1, [2]int{startN1, startM1})
+		cords2 = append(cords2, [2]int{startN2, startM2})
 
-		if check(&sourceMap, &cords, n, m, height, width) {
+		if check(&sourceMap, &cords1, &cords2, n, m, height, width) {
 			fmt.Fprintln(out, "YES")
 		} else {
 			fmt.Fprintln(out, "NO")
 		}
 
 		// Печатаем итоговую карту
-		for i := 0; i < n; i++ {
-			fmt.Fprintln(out, string(sourceMap[i]))
-		}
-		fmt.Fprint(out, "\n")
-
-		break
+		// for i := 0; i < n; i++ {
+		// 	fmt.Fprintln(out, string(sourceMap[i]))
+		// }
+		// fmt.Fprint(out, "\n")
 	}
 }
 
-func check(sourceMap *[][]byte, cords *[]*cord, n, m, height, width int) bool {
+func check(sourceMap *[][]byte, cords1, cords2 *[][2]int, n, m, height, width int) bool {
+	// шесть направление в разные стороны
 	directions := [6][2]int{
 		{height * -1, (height + width) * -1}, // up left
 		{height * -2, 0},                     // up
@@ -108,55 +100,71 @@ func check(sourceMap *[][]byte, cords *[]*cord, n, m, height, width int) bool {
 	}
 	//fmt.Println(directions)
 
-	for size := len(*cords); size > 0; size = len(*cords) {
-		for _, c := range *cords {
-			// проверяем фигуры в шести направлениях и добавляем метки
-			for _, d := range directions {
-				// проверка выхода за координаты
-				if c.n+d[0] <= 0 || c.n+d[0] >= n-height || c.m+d[1] <= 0 || c.m+d[1] >= m {
-					continue
-				}
-
-				// если это море
-				if (*sourceMap)[c.n+d[0]][c.m+d[1]] == '~' {
-					continue
-				}
-
-				// Если при смещение в сторону, на фигуре уже есть противоположная метка, значит пути пересекаются
-				// Если метка таже, значит уже были в этом направление
-				if (*sourceMap)[c.n+d[0]][c.m+d[1]] == '1' {
-					if c.mark == '2' {
-						return true
-					}
-					continue
-				} else if (*sourceMap)[c.n+d[0]][c.m+d[1]] == '2' {
-					if c.mark == '1' {
-						return true
-					}
-					continue
-				}
-
-				// TODO: проверить, есть ли в этих координатах фигура
-				fmt.Println("D:", d, "NM:", c.n, c.m)
-				if !isHexagonByCord(sourceMap, c.n+d[0], c.m+d[1], height, width) {
-					// фигуры нет, ставим символ моря
-					(*sourceMap)[c.n+d[0]][c.m+d[1]] = '~'
-					continue
-				}
-
-				// ставим метку соответствующего пути
-				if (*sourceMap)[c.n+d[0]][c.m+d[1]] == ' ' {
-					(*sourceMap)[c.n+d[0]][c.m+d[1]] = c.mark
-
-					// добавляем новые координаты
-					*cords = append(*cords, &cord{c.mark, c.n + d[0], c.m + d[1]})
-				}
-
+	for size1, size2 := len(*cords1), len(*cords2); size1 > 0 && size2 > 0; size1, size2 = len(*cords1), len(*cords2) {
+		// проверяем накопитель для первой точки
+		for _, c := range *cords1 {
+			if checkDirection(sourceMap, cords1, &c, &directions, n, m, height, width, '1') {
+				return true
 			}
 		}
 
-		// Смещаем проверенные элементы
-		(*cords) = (*cords)[size:]
+		// проверяем накопитель для второй точки
+		for _, c := range *cords2 {
+			if checkDirection(sourceMap, cords2, &c, &directions, n, m, height, width, '2') {
+				return true
+			}
+		}
+
+		// Смещаем проверенные координаты
+		(*cords1) = (*cords1)[size1:]
+		(*cords2) = (*cords2)[size2:]
+	}
+
+	return false
+}
+
+func checkDirection(sourceMap *[][]byte, cords *[][2]int, c *[2]int, directions *[6][2]int, n, m, height, width int, mark byte) bool {
+	// проверяем фигуры в шести направлениях и добавляем метки
+	for _, d := range directions {
+		// проверка выхода за координаты
+		if c[0]+d[0] <= 0 || c[0]+d[0] >= n-height || c[1]+d[1] <= 0 || c[1]+d[1] >= m {
+			continue
+		}
+
+		// если это море
+		if (*sourceMap)[c[0]+d[0]][c[1]+d[1]] == '~' {
+			continue
+		}
+
+		// Если при смещение в сторону, на фигуре уже есть противоположная метка, значит пути пересекаются
+		// Если метка таже, значит уже были в этом направление
+		if (*sourceMap)[c[0]+d[0]][c[1]+d[1]] == '1' {
+			if mark == '2' {
+				return true
+			}
+			continue
+		} else if (*sourceMap)[c[0]+d[0]][c[1]+d[1]] == '2' {
+			if mark == '1' {
+				return true
+			}
+			continue
+		}
+
+		// проверяет, есть ли в этих координатах фигура
+		// fmt.Println("D:", d, "NM:", c[0], c[1])
+		if !isHexagonByCord(sourceMap, c[0]+d[0], c[1]+d[1], height, width) {
+			// фигуры нет, ставим символ моря
+			(*sourceMap)[c[0]+d[0]][c[1]+d[1]] = '~'
+			continue
+		}
+
+		// ставим метку соответствующего пути
+		if (*sourceMap)[c[0]+d[0]][c[1]+d[1]] == ' ' {
+			(*sourceMap)[c[0]+d[0]][c[1]+d[1]] = mark
+
+			// добавляем новые координаты
+			*cords = append(*cords, [2]int{c[0] + d[0], c[1] + d[1]})
+		}
 	}
 
 	return false
