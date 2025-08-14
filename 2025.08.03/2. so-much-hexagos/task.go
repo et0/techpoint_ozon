@@ -7,30 +7,6 @@ import (
 	"strings"
 )
 
-func draw(grid *[][]byte, width, height *int, offsetN, offsetM int) {
-	offsetM++
-	offsetN++
-
-	offset := offsetM + *height
-	// copy((*grid)[offsetN][offset:], []byte(fmt.Sprintf("%s", strings.Repeat("_", *width))))
-	for i := 0; i < *width; i++ {
-		(*grid)[offsetN][offset+i] = '_'
-		(*grid)[offsetN+*height*2][offset+i] = '_'
-	}
-	offsetN++
-
-	space := *height - 1
-	for i := 0; i < *height; i++ {
-		(*grid)[offsetN+i][offsetM+space] = '/'
-		(*grid)[offsetN+i][offsetM+space+*width+2*i+1] = '\\'
-
-		(*grid)[offsetN+*height*2-i-1][offsetM+space] = '\\'
-		(*grid)[offsetN+*height*2-i-1][offsetM+space+*width+2*i+1] = '/'
-
-		space--
-	}
-}
-
 func main() {
 	var in *bufio.Reader
 	var out *bufio.Writer
@@ -43,52 +19,75 @@ func main() {
 	)
 	fmt.Fscan(in, &m, &n, &width, &height, &k)
 
-	grid := make([][]byte, n+2)
+	grid := make([][]byte, n)
 
-	line := []byte(fmt.Sprintf("%s%s%s", "+", strings.Repeat("-", m), "+"))
-	grid[0] = line
-	grid[n+1] = line
-
-	for i := 1; i < n+1; i++ {
-		grid[i] = []byte(fmt.Sprintf("%s%s%s", "|", strings.Repeat(" ", m), "|"))
+	for i := 0; i < n; i++ {
+		grid[i] = []byte(strings.Repeat(" ", m))
 	}
 
-	var offsetX, offsetY, counterInline int
-	var lastLine bool
+	// три направления смещения, куда можно поставить фигуру
+	directions := [][2]int{
+		{height * -1, width + height}, // up right
+		{height, width + height},      // down right)
+		{0, width*2 + height*2},       // right right
+	}
+
+	// Смещение
+	offsetN, offsetM := 0, height
 	for k > 0 {
-		draw(&grid, &width, &height, offsetX, offsetY)
-		counterInline++
+		draw(&grid, width, height, offsetN, offsetM)
+		nextOffset(&grid, &directions, n, m, width, height, &offsetN, &offsetM)
+
 		k--
+	}
 
-		if offsetY+width+height*2 < m-height*2 {
-			if !lastLine {
-				if counterInline%2 != 0 {
-					offsetX += height
-				} else {
-					offsetX -= height
-				}
-				offsetY += width + height
-			} else {
-				offsetY += (width + height) * 2
-			}
-		} else {
-			if counterInline%2 == 0 {
-				offsetX += height
-			} else {
-				offsetX += height * 2
-			}
+	print(out, &grid, n, m)
+}
 
-			if offsetX+height*2+1 >= n-height-1 {
-				lastLine = true
-			}
+func nextOffset(sourceMap *[][]byte, directions *[][2]int, n, m, width, height int, offsetN, offsetM *int) {
+	for _, d := range *directions {
+		if *offsetN+d[0] < 0 {
+			continue
+		}
 
-			offsetY = 0
-			counterInline = 0
+		if *offsetN+d[0] < n-height*2 && *offsetM+d[1] <= m-width-height && (*sourceMap)[*offsetN+d[0]+height*2][*offsetM+d[1]] != '_' {
+			*offsetN += d[0]
+			*offsetM += d[1]
+
+			return
 		}
 	}
 
-	for i := 0; i < n+2; i++ {
-		fmt.Fprintln(out, string(grid[i]))
+	// если направления не подошли, значит на линии закончилось место
+	// следующую фигуру рисуем снизу
+	*offsetM = height
+	if (*sourceMap)[*offsetN+height][*offsetM] == '_' {
+		*offsetN += height
+	} else {
+		*offsetN += height * 2
 	}
 
+}
+
+func draw(sourceMap *[][]byte, width, height, offsetN, offsetM int) {
+	for i := range width {
+		(*sourceMap)[offsetN][offsetM+i] = '_'
+		(*sourceMap)[offsetN+height*2][offsetM+i] = '_'
+	}
+
+	for i := range height {
+		(*sourceMap)[offsetN+i+1][offsetM-i-1] = '/'
+		(*sourceMap)[offsetN+i+1][offsetM+width+i] = '\\'
+
+		(*sourceMap)[offsetN+height*2-i][offsetM-i-1] = '\\'
+		(*sourceMap)[offsetN+height*2-i][offsetM+width+i] = '/'
+	}
+}
+
+func print(out *bufio.Writer, sourceMap *[][]byte, n, m int) {
+	fmt.Fprintf(out, "%s%s%s\n", "+", strings.Repeat("-", m), "+")
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(out, "%s%s%s\n", "|", string((*sourceMap)[i]), "|")
+	}
+	fmt.Fprintf(out, "%s%s%s\n", "+", strings.Repeat("-", m), "+")
 }
